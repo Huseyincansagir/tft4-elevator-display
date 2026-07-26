@@ -6,19 +6,13 @@
  *   - ~1.000.000 yazma cevrimi (NOR flash'ta ~10.000)
  *   - boot imajiyla ayni cipte degil      -> yanlis adres karti tuglalastirmaz
  *
- * ############################## DIKKAT ##############################
- * Kartlarda IKI EEPROM var ve ikisinin de I2C adresi 0x50:
+ * Hedef cihaz:
  *
- *   U3  24LC128T-I/SN  16 KB  (base board)  -> 2 BYTE kelime adresi
- *   U4  24AA02HT-I/OT  256 B  (module)      -> 1 BYTE kelime adresi
+ *   U3  24LC128T-I/SN  16 KB  (base board)  -> 2 BYTE kelime adresi   [KULLANILAN]
+ *   U4  24AA02HT-I/OT  256 B  (module)      -> DIZILMIYOR (DNP)
  *
- * Ayni hatta ikisi birden olamaz; biri dizilmiyor olmali. Hangisinin
- * takili oldugu semanin metin katmanindan cikarilamadi. Adres genisligi
- * yanlis secilirse yazma islemi hedefi tutmaz, bu yuzden asagidaki iki
- * tanim GERCEK KARTTA DOGRULANMALIDIR.
- *
- * Dogrulandiktan sonra tek yapilacak: MEPROM_ADDR_BYTES'i 1 veya 2 yapmak.
- * ####################################################################
+ * Semada ikisi de 0x50 adresinde gorunuyor; U4 dizilmedigi icin hatta
+ * cakisma yok ve 0x50 tamamen U3'e ait.
  *
  * Tum I2C hatalari sessizce yutulur: EEPROM yoksa/erisilemezse yonelim
  * yine calisir, sadece guc kesildiginde varsayilana doner.
@@ -33,11 +27,12 @@
 #include <rtdbg.h>
 
 #define MEPROM_I2C_BUS      "i2c0"
-#define MEPROM_I2C_ADDR     0x50    /* 7 bit */
+#define MEPROM_I2C_ADDR     0x50    /* 7 bit — U3 24LC128 (U4 dizilmiyor) */
 
-#define MEPROM_ADDR_BYTES   2       /* 24LC128 -> 2,  24AA02 -> 1   (DOGRULA!) */
+#define MEPROM_ADDR_BYTES   2       /* 24LC128: 16 KB, 2 byte kelime adresi */
 
-/* Ayar bloguna, ilk sayfanin disinda, sade bir yer ayirdik */
+/* Ayar blogu. 24LC128'in sayfa boyu 64 byte ama tek tek byte yazdigimiz
+   icin sayfa siniri onemli degil; yine de ilk sayfanin disinda duruyoruz. */
 #define MEPROM_OFF_MAGIC    0x0010
 #define MEPROM_OFF_ORIENT   0x0011
 #define MEPROM_MAGIC        0x5A    /* "burasi bizim tarafimizdan yazildi" */
