@@ -112,8 +112,8 @@ Hepsi `applications/app/mainpage.c` başında, derleme zamanı `#define`:
 | Aşırı akım (SC) | M031 PA.11 | Koruma hattı — buton **değil** |
 | Çağrı girişleri | M031 PB.0 / PB.2 | 24 V saha girişi, 5.6k/820 bölücü → **aktif HIGH** |
 | Buzzer | M031 PA.4 / PA.5 | PA.5 = PWM0_CH0 |
-| SPI flash | F1C100S SPI0 | **W25Q128JVSIQ** 16 MB (U5, Module) |
-| **EEPROM** | F1C100S I2C0 (PE11/PE12) | **U3** `24LC128` 16 KB (base), adres 0x50 — *U4 `24AA02` dizilmiyor* |
+| SPI flash | F1C100S SPI0 (`spi00`) | **W25Q128JVSIQ** 16 MB (U5, Module) — SPL + firmware + ayar sektoru |
+| EEPROM | — | Semada `24LC128`/`24AA02` gorunuyor ama **dizilmiyor** |
 | Arkel↔ekran SPI | F1C100S PE7–PE10 | CS / MOSI / CLK / MISO → M031 PA.3–PA.0 |
 
 > ⚠️ **NXT/RTN eşleşmesi doğrulanmadı.** İki butonun PC.2 ve PC.3'e gittiği kesin
@@ -131,7 +131,7 @@ Toplam direnç de aynı sebeple 16.8K yerine 6.4K olarak değiştirildi."*
 
 ## Çalışma zamanı yönelim (NXT butonu)
 
-Yönelim artık derleme zamanı `#define` değil; NXT butonuyla değişiyor ve EEPROM'da
+Yönelim artık derleme zamanı `#define` değil; NXT butonuyla değişiyor ve SPI flash'te
 saklanıyor. Zincir:
 
 ```
@@ -144,7 +144,7 @@ button = 0x01                       acm_dr.c
 arcodeLop.reserved2                 mainpage.c
    │  handle_buttons() — KENAR yakalar (seviye degil)
    ▼
-g_orient ^= 1  →  meprom_save_orient()  →  I2C EEPROM
+g_orient ^= 1  →  meprom_save_orient()  →  SPI flash 0x200000
    │
    ▼  lv_img_cache_invalidate_src(NULL) + lv_obj_invalidate(lv_scr_act())
 sonraki display_floor()/display_state() cagrisi yeni yonelimle cizer
@@ -157,12 +157,12 @@ Tasarım notları:
 - **Seviye gönderilir, kenar yakalanır.** M031 buton basılı olduğu sürece maskeyi set
   tutar; ekran yalnızca `0 → 1` geçişinde tetiklenir. Tek paket kaybolsa bir sonraki
   aynı seviyeyi taşıdığı için ne komut kaçar ne çift tetikleme olur.
-- **Kalıcılık EEPROM'da, flash'ta değil.** Hedef **U3 `24LC128`** (16 KB, I2C 0x50,
-  2 byte kelime adresi). Byte yazılabilir (sektör silme yok), ~1M yazma çevrimi, ve
-  boot imajıyla aynı çipte olmadığı için yanlış adres kartı tuğlalaştıramaz.
-  `meprom.c` — sihirli byte en sona yazılır, yarıda kesilen yazma geçersiz kalıp
-  fallback'e döner. I2C hataları sessizce yutulur: EEPROM yoksa yönelim yine
-  çalışır, sadece güç kesildiğinde varsayılana döner.
+- **Kalıcılık SPI flash'te.** Kartta EEPROM entegresi yok, o yüzden ayar **U5 W25Q128**'in
+  `0x200000` adresindeki 4 KB sektöründe tutuluyor. Firmware `0x10000`'den başlayıp
+  ~`0xA3000`'de bittiği için arada ~1.4 MB güvenlik payı var. `meprom.c` açılışta JEDEC
+  ID okuyup Winbond görmezse **hiç yazma yapmaz**, yazdıktan sonra geri okuyup doğrular.
+  Tüm hatalar yutulur: flash erişilemezse yönelim yine çalışır, sadece güç kesildiğinde
+  varsayılana döner.
 - **Yerleşim sabitleri birebir korundu.** `THIS_ROTATION`, `*_ALIGN`, `*_OFFSET`
   makroları aynı isimlerle duruyor, sadece değerlerini `g_orient` üzerinden seçiyor —
   böylece `lv_obj_align()` / `lv_img_set_angle()` çağrı noktalarının hiçbiri değişmedi.

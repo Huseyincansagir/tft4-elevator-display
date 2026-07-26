@@ -4,8 +4,8 @@
 #include <stdint.h>
 
 /*
- * Kart uzerindeki I2C EEPROM'da tutulan kalici ayarlar.
- * I2C0 = F1C100S PE11 (SCL) / PE12 (SDA), "i2c0" olarak kayitli, 400 kHz.
+ * Kalici ayarlar — U5 W25Q128 SPI NOR flash, "spi00" cihazi.
+ * Ayar sektoru 0x200000 (firmware imajinin cok otesinde).
  */
 
 void    meprom_init(void);
