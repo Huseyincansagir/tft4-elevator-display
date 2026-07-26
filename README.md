@@ -97,7 +97,7 @@ Hepsi `applications/app/mainpage.c` başında, derleme zamanı `#define`:
 
 | Anahtar | Etki |
 |---|---|
-| `DISPLAY_VER` / `DISPLAY_HOR` | Ekran yönelimi — dönme açısı, hizalama, görsel seti |
+| ~~`DISPLAY_VER` / `DISPLAY_HOR`~~ | **Kaldırıldı** — yönelim artık çalışma zamanında, NXT butonuyla |
 | `ELEV_DEMO` | Arkel'i hiç okumaz, gömülü demo senaryosunu döndürür |
 | `BUTSAN` | Butsan'a özel ok logoları |
 | `DISPLAY_MSG` | İkon yerine tam sayfa İngilizce mesajlar |
@@ -107,22 +107,74 @@ Hepsi `applications/app/mainpage.c` başında, derleme zamanı `#define`:
 
 | Sinyal | Pin | Not |
 |---|---|---|
-| **NXT butonu** | M031 **PC.2** | Aktif LOW, harici 10k pull-up (R14), donanım debounce yok |
-| **RTN butonu** | M031 **PC.3** | Aktif LOW, harici 10k pull-up (R13), donanım debounce yok |
+| **NXT butonu** | M031 **PC.2** ⚠️ | Aktif LOW, harici 10k pull-up (R14), donanım debounce yok |
+| **RTN butonu** | M031 **PC.3** ⚠️ | Aktif LOW, harici 10k pull-up (R13), donanım debounce yok |
 | Aşırı akım (SC) | M031 PA.11 | Koruma hattı — buton **değil** |
 | Çağrı girişleri | M031 PB.0 / PB.2 | 24 V saha girişi, 5.6k/820 bölücü → **aktif HIGH** |
 | Buzzer | M031 PA.4 / PA.5 | PA.5 = PWM0_CH0 |
-| SPI flash | F1C100S SPI0 | **W25Q128** 16 MB (U5, Module) |
+| SPI flash | F1C100S SPI0 | **W25Q128JVSIQ** 16 MB (U5, Module) |
+| **EEPROM** | F1C100S I2C0 (PE11/PE12) | **U3** `24LC128` 16 KB (base) · **U4** `24AA02` 256 B (module) |
 | Arkel↔ekran SPI | F1C100S PE7–PE10 | CS / MOSI / CLK / MISO → M031 PA.3–PA.0 |
 
+> ⚠️ **NXT/RTN eşleşmesi doğrulanmadı.** İki butonun PC.2 ve PC.3'e gittiği kesin
+> (M031 sayfasında dışarı çıkan tek boş GPIO çifti bunlar ve `sys_Init()` ikisini de
+> GPIO olarak yapılandırıp hiç okumuyor), ama *hangisinin hangisi* olduğu şema
+> PDF'inin metin katmanından çıkarılamadı. Ters çıkarsa `acm_dr.c` içindeki
+> `BTN_NXT_PRESSED` / `BTN_RTN_PRESSED` tanımlarını yer değiştirmek yeterli.
+
+> ⚠️ **İki EEPROM da 0x50 adresinde.** Aynı hatta ikisi birden olamaz — biri
+> dizilmiyor olmalı. Kelime adresi genişliği farklı (24LC128 → 2 byte,
+> 24AA02 → 1 byte), bu yüzden `meprom.c` içindeki `MEPROM_ADDR_BYTES`
+> gerçek kartta doğrulanmalıdır.
+
 > **Dikkat:** Şemada işlemci `M031LC2AE`, Keil projesinin hedefi ise `M032SE3AE`
-> (128 KB flash / 16 KB SRAM). Flash'a ayar yazmadan önce karttaki gerçek parça
-> doğrulanmalıdır.
+> (128 KB flash / 16 KB SRAM). Karttaki gerçek parça doğrulanmalıdır.
 
-## Devam eden iş
+Şemada tasarımcının kendi notu (`Input.SchDoc`): *"6.8K/10K gerilim bölme oranı
+sahada yaşanan uzun kablolama gürültüsü nedeniyle 5.6K/820 şeklinde değiştirildi.
+Toplam direnç de aynı sebeple 16.8K yerine 6.4K olarak değiştirildi."*
 
-Yönelimi (DİK/YAN) derleme zamanından çıkarıp **NXT butonuyla çalışma zamanında**
-değiştirilebilir hâle getirmek. Taşıma kanalı zaten mevcut: M031, Arkel paketini ekrana
-iletmeden önce `uuart_rx_data[13]`'e kendi buton byte'ını yazıp checksum'u yeniden
-hesaplıyor (`acm_dr.c`); ekran tarafında bu byte `arcodeLop.reserved2` olarak geliyor ama
-şu an okunmuyor.
+## Çalışma zamanı yönelim (NXT butonu)
+
+Yönelim artık derleme zamanı `#define` değil; NXT butonuyla değişiyor ve EEPROM'da
+saklanıyor. Zincir:
+
+```
+NXT butonu (M031 PC.2, aktif LOW)
+   │  scan_Buttons() — 20 tur filtre (~40 ms)
+   ▼
+button = 0x01                       acm_dr.c
+   │  uuart_rx_data[13] = button; checksum yeniden hesaplanir
+   ▼  (mevcut Arkel paketi, yeni alan yok)
+arcodeLop.reserved2                 mainpage.c
+   │  handle_buttons() — KENAR yakalar (seviye degil)
+   ▼
+g_orient ^= 1  →  meprom_save_orient()  →  I2C EEPROM
+   │
+   ▼  lv_img_cache_invalidate_src(NULL) + lv_obj_invalidate(lv_scr_act())
+sonraki display_floor()/display_state() cagrisi yeni yonelimle cizer
+```
+
+Tasarım notları:
+
+- **Protokolde değişiklik yok.** Byte 13 zaten M031 tarafından yazılıyordu, ekran
+  tarafında okunmuyordu. Yeni alan eklenmedi, paket boyu aynı.
+- **Seviye gönderilir, kenar yakalanır.** M031 buton basılı olduğu sürece maskeyi set
+  tutar; ekran yalnızca `0 → 1` geçişinde tetiklenir. Tek paket kaybolsa bir sonraki
+  aynı seviyeyi taşıdığı için ne komut kaçar ne çift tetikleme olur.
+- **Kalıcılık EEPROM'da, flash'ta değil.** Byte yazılabilir (sektör silme yok), ~1M
+  yazma çevrimi, ve boot imajıyla aynı çipte olmadığı için yanlış adres kartı
+  tuğlalaştıramaz. `meprom.c` — sihirli byte en sona yazılır, yarıda kesilen yazma
+  geçersiz kalıp fallback'e döner. I2C hataları sessizce yutulur: EEPROM yoksa
+  yönelim yine çalışır, sadece güç kesildiğinde varsayılana döner.
+- **Yerleşim sabitleri birebir korundu.** `THIS_ROTATION`, `*_ALIGN`, `*_OFFSET`
+  makroları aynı isimlerle duruyor, sadece değerlerini `g_orient` üzerinden seçiyor —
+  böylece `lv_obj_align()` / `lv_img_set_angle()` çağrı noktalarının hiçbiri değişmedi.
+
+> **ELEV_DEMO açıkken buton çalışmaz.** Demo modunda Arkel paketi hiç okunmadığı için
+> byte 13 ekrana ulaşmaz. Test için `mainpage.c` başındaki `#define ELEV_DEMO`
+> satırı yorum satırı yapılmalıdır.
+
+> **Binary büyüdü.** İki görsel seti de artık referanslandığı için `--gc-sections`
+> birini atmıyor. Yükleme öncesi `rtthread.bin` boyutunun SPI flash yerleşimine
+> (firmware 0x10000'den başlıyor) sığdığı doğrulanmalı.
