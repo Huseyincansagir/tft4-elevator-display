@@ -1,0 +1,9 @@
+{
+    "RTT_Studio.Build.Parallel_Jobs": "16",
+    "files.associations": {
+        "drv_clock.h": "c",
+        "drv_gpio.h": "c",
+        "drv_spi.h": "c"
+    },
+    "C_Cpp.dimInactiveRegions": true
+}

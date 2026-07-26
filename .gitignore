@@ -1,0 +1,47 @@
+# ---------------------------------------------------------------------------
+# Toolchain — yeniden indirilebilir, depoda yeri yok
+# ---------------------------------------------------------------------------
+wetransfer_git_2026-07-23_1249/git/tools/gcc-arm-none-eabi/
+wetransfer_git_2026-07-23_1249/git/tools/sunxi-tools.tar.gz
+
+# ---------------------------------------------------------------------------
+# SCons / GCC derleme ciktilari (F1C100S tarafi)
+# NOT: rtthread.elf, rtthread.map ve *.bin BILEREK tutuluyor —
+#      sahadaki binary'lerin ne oldugunu belgeliyorlar.
+# ---------------------------------------------------------------------------
+build/
+*.o
+*.d
+*.pyc
+__pycache__/
+.sconsign.dblite
+rtt.asm
+
+# ---------------------------------------------------------------------------
+# Keil MDK derleme ciktilari (Nuvoton M031 tarafi)
+# ---------------------------------------------------------------------------
+obj/
+*.uvguix.*
+*.dep
+*.crf
+*.lnp
+*.lst
+*.bak
+*.i
+*.__i
+
+# ---------------------------------------------------------------------------
+# Editor / OS
+# ---------------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+*.swp
+*~
+
+# ---------------------------------------------------------------------------
+# sunxi-tools: kendi .git deposuna sahip upstream klonu (dokunulmadi).
+# Icenowy/sunxi-tools @ 11a9d20 — README "Harici bagimliliklar" bolumune bak.
+# ---------------------------------------------------------------------------
+# NOT: sondaki "/" OLMAMALI — gitlink (mode 160000) girisini yalnizca
+# egik cizgisiz desen eleyebiliyor.
+wetransfer_git_2026-07-23_1249/git/tools/sunxi-tools

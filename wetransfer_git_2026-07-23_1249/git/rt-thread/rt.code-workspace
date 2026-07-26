@@ -1,0 +1,25 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"files.associations": {
+			"common.h": "c",
+			"scan.h": "c",
+			"stdint.h": "c",
+			"cstdint": "c",
+			"serialio.h": "c",
+			"*.tcc": "c",
+			"cmath": "c",
+			"numeric": "c",
+			"cinttypes": "c",
+			"cstdlib": "c",
+			"gclk.h": "c",
+			"math.h": "c",
+			"stdio.h": "c"
+		},
+		"git.ignoreLimitWarning": true
+	}
+}

@@ -1,0 +1,16 @@
+{
+    "RTT_Studio.Build.Parallel_Jobs": "16",
+    "git.ignoreLimitWarning": true,
+    "files.associations": {
+        "rtdevice.h": "c",
+        "drv_gpio.h": "c",
+        "serialio.h": "c",
+        "lv_obj.h": "c",
+        "serial.h": "c",
+        "drv_touch.h": "c",
+        "rtthread.h": "c",
+        "rtdebug.h": "c",
+        "rtservice.h": "c",
+        "rtdef.h": "c"
+    }
+}
