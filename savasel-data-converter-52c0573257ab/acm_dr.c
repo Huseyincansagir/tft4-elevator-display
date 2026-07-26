@@ -54,30 +54,7 @@ uint8_t IsCallUp(void);
 uint8_t IsPI1(void);
 uint8_t IsPI2(void);
 
-static void scan_Buttons(void);
-
 uint8_t CalculateChecksum(uint8_t *ptr);
-
-/*
- * NXT / RTN panel butonlari.
- *
- * Sema: 3V3 --[10k]-- pin, buton pini GND'ye kisa devre eder  ->  AKTIF LOW.
- * Donanim debounce yok, yazilimda filtreleniyor.
- *
- * DIKKAT: PC.2 ve PC.3'un NXT/RTN ile eslesmesi semanin metin katmanindan
- * kesin cikarilamadi. Ters cikarsa asagidaki iki tanimi yer degistirmek yeterli.
- */
-#define BTN_NXT_PRESSED()   (PC2 == 0)
-#define BTN_RTN_PRESSED()   (PC3 == 0)
-
-/* Pakette byte 13 ile ekrana tasinan buton maskesi (arcodeLop.reserved2) */
-#define BTN_CODE_NXT        0x01
-#define BTN_CODE_RTN        0x02
-
-#define BTN_FIL_DELAY       20      /* IsCallUp/Down ile ayni filtre suresi */
-
-uint16_t NxtCounter;
-uint16_t RtnCounter;
 
 /*---------------------------------------------------------------------------------------------------------*/
 /* MAIN function                                                                                           */
@@ -273,7 +250,33 @@ int main(void)
 					bip_now = 0;
 				}
 				
-				scan_Buttons();
+				/*
+				if((PIND&_BV(PIND6)) == 0)
+				{
+					nextb_cnt++;
+					if(nextb_cnt>50)
+						button = 'N';
+				}
+				else
+				{
+					nextb_cnt=0;
+				
+					if((PIND&_BV(PIND7)) == 0)
+					{
+						retnb_cnt++;
+						if(retnb_cnt>2000)
+							button = '\r';
+						else if(retnb_cnt>50)
+							button = 'U';
+						
+					}
+					else
+					{
+						retnb_cnt=0;
+						button = 0;
+					}
+				}
+				*/
 			}
 		}
 	}
@@ -332,57 +335,13 @@ uint8_t IsPI2(void)
 	return (PI2Counter > INPUT_FIL_DELAY) ? -1:0;
 }
 
-/*
- * Panel butonlarini filtreleyip pakete tasinan maskeyi uretir.
- *
- * Ekran tarafi bu byte'in KENARINI yakalar (seviye degil), bu yuzden burada
- * basili tutuldugu surece maske set kalir; birakinca sifirlanir. Boylece tek
- * bir paket kaybolsa bile bir sonraki paket ayni seviyeyi tasir.
- */
-static void scan_Buttons(void)
-{
-	uint8_t mask = 0;
-
-	if(BTN_NXT_PRESSED())
-	{
-		if(NxtCounter <= BTN_FIL_DELAY)
-			NxtCounter++;
-	}
-	else
-	{
-		NxtCounter = 0;
-	}
-
-	if(BTN_RTN_PRESSED())
-	{
-		if(RtnCounter <= BTN_FIL_DELAY)
-			RtnCounter++;
-	}
-	else
-	{
-		RtnCounter = 0;
-	}
-
-	if(NxtCounter > BTN_FIL_DELAY)
-		mask |= BTN_CODE_NXT;
-
-	if(RtnCounter > BTN_FIL_DELAY)
-		mask |= BTN_CODE_RTN;
-
-	button = mask;
-}
-
 static void pio_Init(void)
 {
 	GPIO_SET_OUT_DATA(PB, 0);
 	GPIO_SET_OUT_DATA(PA, 0);
-
+	
 	GPIO_SetMode(PB, BIT1|BIT3|BIT5|BIT7|BIT15, GPIO_MODE_OUTPUT);
 	GPIO_SetMode(PA, BIT4, GPIO_MODE_OUTPUT);
-
-	/* NXT / RTN butonlari: giris + dahili pull-up (harici 10k'ya ek guvence) */
-	GPIO_SetMode(PC, BIT2|BIT3, GPIO_MODE_INPUT);
-	GPIO_SetPullCtl(PC, BIT2|BIT3, GPIO_PUSEL_PULL_UP);
 }
 
 static void tmr_Init(void)

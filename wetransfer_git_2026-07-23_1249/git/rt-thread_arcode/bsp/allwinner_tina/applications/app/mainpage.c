@@ -5,7 +5,6 @@
 #include "serialio.h"
 #include "convert.h"
 #include "arcode.h"
-#include "meprom.h"
 #include <ctype.h>
 
 // *****  Display Settings     **********
@@ -15,19 +14,8 @@
 
 //#define DISPLAY_MSG	//ingilizce tam sayfa mesajlari gosterir
 
-/*
- * Ekran yonelimi artik CALISMA ZAMANINDA degisir (NXT butonu).
- *
- * Eskiden burada DISPLAY_HOR / DISPLAY_VER #define'i vardi. Asagidaki yerlesim
- * makrolari ayni isimlerle duruyor ama degerlerini g_orient uzerinden seciyor;
- * boylece lv_obj_align()/lv_img_set_angle() cagri noktalari aynen korundu.
- *
- * ORIENT_VER = dik montaj, ORIENT_HOR = yan montaj (icerik 90 derece doner).
- */
-#define ORIENT_VER		0
-#define ORIENT_HOR		1
-
-uint8_t g_orient = ORIENT_VER;		/* acilista meprom_load_orient() ile ezilir */
+#define DISPLAY_HOR
+//#define DISPLAY_VER
 
 #define MLV_WHITE           lv_color_hex(0xffffff)
 #define MLV_BLACK           lv_color_hex(0x000000)
@@ -76,34 +64,50 @@ uint8_t g_orient = ORIENT_VER;		/* acilista meprom_load_orient() ile ezilir */
  #define SCR_BG_COLOR		MLV_WHITE
 #endif
 
-/*
- * Yerlesim sabitleri — degerler eskisiyle BIREBIR ayni, sadece secim
- * derleme zamanindan calisma zamanina tasindi.
- *
- *                          DIK (VER)              YAN (HOR)
- *   THIS_ROTATION            0                      900  (= 90.0 derece)
- *   SIGNAL_Y_OFFSET         14                       10
- *   MID_CHAR_Y_OFFSET      -34                        0
- *   LEFT_CHAR  X/Y       -110 / -34                 0 / -120
- *   RIGHT_CHAR X/Y        110 / -34                 0 /  100
- */
-#define THIS_ROTATION			((g_orient == ORIENT_HOR) ? 900 : 0)
+#ifdef DISPLAY_VER
+ 
+  #define THIS_ROTATION		0
+  
+  #define SIGNAL_ALIGN				LV_ALIGN_IN_TOP_MID
+  #define SIGNAL_X_OFFSET			0
+  //#define SIGNAL_Y_OFFSET			20
+  #define SIGNAL_Y_OFFSET			14
 
-#define SIGNAL_ALIGN			LV_ALIGN_IN_TOP_MID
-#define SIGNAL_X_OFFSET			0
-#define SIGNAL_Y_OFFSET			((g_orient == ORIENT_HOR) ? 10 : 14)
+  #define MID_CHAR_ALIGN			LV_ALIGN_IN_BOTTOM_MID
+  #define MID_CHAR_X_OFFSET			0
+// #define MID_CHAR_Y_OFFSET		-20
+   #define MID_CHAR_Y_OFFSET		-34 
 
-#define MID_CHAR_ALIGN			LV_ALIGN_IN_BOTTOM_MID
-#define MID_CHAR_X_OFFSET		0
-#define MID_CHAR_Y_OFFSET		((g_orient == ORIENT_HOR) ? 0 : -34)
+  #define LEFT_CHAR_ALIGN			LV_ALIGN_IN_BOTTOM_MID
+  #define LEFT_CHAR_X_OFFSET		-110
+// #define LEFT_CHAR_Y_OFFSET		-20
+   #define LEFT_CHAR_Y_OFFSET		-34 
 
-#define LEFT_CHAR_ALIGN			LV_ALIGN_IN_BOTTOM_MID
-#define LEFT_CHAR_X_OFFSET		((g_orient == ORIENT_HOR) ? 0 : -110)
-#define LEFT_CHAR_Y_OFFSET		((g_orient == ORIENT_HOR) ? -120 : -34)
+  #define RIGHT_CHAR_ALIGN			LV_ALIGN_IN_BOTTOM_MID
+  #define RIGHT_CHAR_X_OFFSET		110
+/// #define RIGHT_CHAR_Y_OFFSET		-20
+   #define RIGHT_CHAR_Y_OFFSET		-34 
 
-#define RIGHT_CHAR_ALIGN		LV_ALIGN_IN_BOTTOM_MID
-#define RIGHT_CHAR_X_OFFSET		((g_orient == ORIENT_HOR) ? 0 : 110)
-#define RIGHT_CHAR_Y_OFFSET		((g_orient == ORIENT_HOR) ? 100 : -34)
+#elif defined DISPLAY_HOR
+
+ #define THIS_ROTATION		900
+
+ #define SIGNAL_ALIGN		LV_ALIGN_IN_TOP_MID
+ #define SIGNAL_X_OFFSET		0
+ #define SIGNAL_Y_OFFSET		10
+
+ #define MID_CHAR_ALIGN			LV_ALIGN_IN_BOTTOM_MID
+ #define MID_CHAR_X_OFFSET		0
+ #define MID_CHAR_Y_OFFSET		0
+
+ #define LEFT_CHAR_ALIGN		LV_ALIGN_IN_BOTTOM_MID
+ #define LEFT_CHAR_X_OFFSET		0
+ #define LEFT_CHAR_Y_OFFSET		-120
+
+ #define RIGHT_CHAR_ALIGN		LV_ALIGN_IN_BOTTOM_MID
+ #define RIGHT_CHAR_X_OFFSET	0
+ #define RIGHT_CHAR_Y_OFFSET	100
+#endif
 
 
 
@@ -158,7 +162,7 @@ lv_obj_t* p_signal = RT_NULL;
 
 LV_IMG_DECLARE(bg_png)
 
-/* Her iki yonelim setinin tamami: secim calisma zamaninda yapiliyor. */
+#ifdef DISPLAY_VER
 
 	LV_IMG_DECLARE(fa_0)
 	LV_IMG_DECLARE(fa_1)
@@ -215,6 +219,7 @@ LV_IMG_DECLARE(bg_png)
 	LV_IMG_DECLARE(messageDoorOpenErrorVerEn)			//6
 	LV_IMG_DECLARE(messageIdleVerEn)					//7
 	LV_IMG_DECLARE(messageServiceControlVerEn)			//8,9	
+#else
 
 	LV_IMG_DECLARE(fa0_png)
 	LV_IMG_DECLARE(fa1_png)
@@ -273,6 +278,7 @@ LV_IMG_DECLARE(bg_png)
 	LV_IMG_DECLARE(messageIdleHorEn)					//7
 	LV_IMG_DECLARE(messageServiceControlHorEn)			//8,9	
 
+#endif
 
 LV_IMG_DECLARE(ay_png)
 
@@ -330,24 +336,21 @@ void display_state(uint32_t state)
 	else if((state == LS_MOVING_UP) || (state == LS_COLLECT_UP))
 	{
 		lv_obj_set_hidden(p_signal, RT_FALSE);
-		if(g_orient == ORIENT_HOR)
-		{
+		#ifdef DISPLAY_HOR
 			#ifdef BUTSAN
 			lv_img_set_src(p_signal, &iconUpArrowHorButsan);
 			#else
 			lv_img_set_src(p_signal, &iconUpArrowHor);
 			#endif
-			lv_obj_set_size(p_signal, 480, 320);
-		}
-		else
-		{
+		lv_obj_set_size(p_signal, 480, 320);
+		#else
 			#ifdef BUTSAN
 			lv_img_set_src(p_signal, &iconUpArrowVerButsan);
 			#else
 			lv_img_set_src(p_signal, &iconUpArrowVer);
 			#endif
-			lv_obj_set_size(p_signal, 280, 380);
-		}
+		lv_obj_set_size(p_signal, 280, 380);
+		#endif
 		lv_img_set_angle(p_signal, 0);
 		lv_obj_reset_style_list(p_signal, LV_OBJ_PART_MAIN);
 		if(state == LS_MOVING_UP)
@@ -361,24 +364,22 @@ void display_state(uint32_t state)
 	else if((state == LS_MOVING_DOWN)||(state == LS_COLLECT_DOWN))
 	{
 		lv_obj_set_hidden(p_signal, RT_FALSE);
-		if(g_orient == ORIENT_HOR)
-		{
+		#ifdef DISPLAY_HOR
 			#ifdef BUTSAN
 			lv_img_set_src(p_signal, &iconDownArrowHorButsan);
 			#else
 			lv_img_set_src(p_signal, &iconDownArrowHor);
 			#endif
 			lv_obj_set_size(p_signal, 480, 320);
-		}
-		else
-		{
+		#else
 			#ifdef BUTSAN
 			lv_img_set_src(p_signal, &iconDownArrowVerButsan);
 			#else
 			lv_img_set_src(p_signal, &iconDownArrowVer);
 			#endif
+			
 			lv_obj_set_size(p_signal, 280, 380);
-		}
+		#endif
 		lv_img_set_angle(p_signal, 0);
 		lv_obj_reset_style_list(p_signal, LV_OBJ_PART_MAIN);
 		
@@ -397,65 +398,6 @@ void display_state(uint32_t state)
 	lv_img_cache_invalidate_src(p_signal);
 }
 
-
-/*
- * Karakter -> gorsel eslesmesi. Iki sutun da eski #ifdef bloklarindan
- * BIREBIR alindi; 'x' harfi eskiden de her iki sette yoktu, oyle birakildi.
- */
-typedef struct {
-	char c;
-	const lv_img_dsc_t *ver;
-	const lv_img_dsc_t *hor;
-} glyph_map_t;
-
-static const glyph_map_t glyph_map[] = {
-	{ '0', &fa_0, &fa0_png },
-	{ '1', &fa_1, &fa1_png },
-	{ '2', &fa_2, &fa2_png },
-	{ '3', &fa_3, &fa3_png },
-	{ '4', &fa_4, &fa4_png },
-	{ '5', &fa_5, &fa5_png },
-	{ '6', &fa_6, &fa6_png },
-	{ '7', &fa_7, &fa7_png },
-	{ '8', &fa_8, &fa8_png },
-	{ '9', &fa_9, &fa9_png },
-	{ 'a', &fa_a, &faa_png },
-	{ 'b', &fa_b, &fab_png },
-	{ 'c', &fa_c, &fac_png },
-	{ 'd', &fa_d, &fad_png },
-	{ 'e', &fa_e, &fae_png },
-	{ 'f', &fa_f, &faf_png },
-	{ 'g', &fa_g, &fag_png },
-	{ 'h', &fa_h, &fah_png },
-	{ 'i', &fa_i, &fai_png },
-	{ 'j', &fa_j, &faj_png },
-	{ 'k', &fa_k, &fak_png },
-	{ 'l', &fa_l, &fal_png },
-	{ 'm', &fa_m, &fam_png },
-	{ 'n', &fa_n, &fan_png },
-	{ 'o', &fa_o, &fao_png },
-	{ 'p', &fa_p, &fap_png },
-	{ 'q', &fa_q, &faq_png },
-	{ 'r', &fa_r, &far_png },
-	{ 's', &fa_s, &fas_png },
-	{ 't', &fa_t, &fat_png },
-	{ 'u', &fa_u, &fau_png },
-	{ 'v', &fa_v, &fav_png },
-	{ 'w', &fa_w, &faw_png },
-	{ 'y', &fa_y, &fay_png },
-	{ 'z', &fa_z, &faz_png },
-	{ '-', &sy_m, &faminus_png },
-};
-
-static const lv_img_dsc_t * glyph_img(char c)
-{
-	for(unsigned i = 0; i < sizeof(glyph_map)/sizeof(glyph_map[0]); i++)
-	{
-		if(glyph_map[i].c == c)
-			return (g_orient == ORIENT_HOR) ? glyph_map[i].hor : glyph_map[i].ver;
-	}
-	return RT_NULL;
-}
 
 void display_floor(int8_t left, int8_t right)
 {
@@ -508,9 +450,89 @@ void display_floor(int8_t left, int8_t right)
 		{
 			c = tolower(c);
 
-			const lv_img_dsc_t *img = glyph_img(c);
-			if(img)
-				lv_img_set_src(pobj, img);
+			switch(c)
+			{
+#ifdef DISPLAY_VER
+
+			case '0': lv_img_set_src(pobj, &fa_0);break;
+			case '1': lv_img_set_src(pobj, &fa_1);break;
+			case '2': lv_img_set_src(pobj, &fa_2);break;
+			case '3': lv_img_set_src(pobj, &fa_3);break;
+			case '4': lv_img_set_src(pobj, &fa_4);break;
+			case '5': lv_img_set_src(pobj, &fa_5);break;
+			case '6': lv_img_set_src(pobj, &fa_6);break;
+			case '7': lv_img_set_src(pobj, &fa_7);break;
+			case '8': lv_img_set_src(pobj, &fa_8);break;
+			case '9': lv_img_set_src(pobj, &fa_9);break;
+
+			case 'a': lv_img_set_src(pobj, &fa_a);break;
+			case 'b': lv_img_set_src(pobj, &fa_b);break;
+			case 'c': lv_img_set_src(pobj, &fa_c);break;
+			case 'd': lv_img_set_src(pobj, &fa_d);break;
+			case 'e': lv_img_set_src(pobj, &fa_e);break;
+			case 'f': lv_img_set_src(pobj, &fa_f);break;
+			case 'g': lv_img_set_src(pobj, &fa_g);break;
+			case 'h': lv_img_set_src(pobj, &fa_h);break;
+			case 'i': lv_img_set_src(pobj, &fa_i);break;
+			case 'j': lv_img_set_src(pobj, &fa_j);break;
+			case 'k': lv_img_set_src(pobj, &fa_k);break;
+			case 'l': lv_img_set_src(pobj, &fa_l);break;
+			case 'm': lv_img_set_src(pobj, &fa_m);break;
+			case 'n': lv_img_set_src(pobj, &fa_n);break;
+			case 'o': lv_img_set_src(pobj, &fa_o);break;
+			case 'p': lv_img_set_src(pobj, &fa_p);break;
+			case 'q': lv_img_set_src(pobj, &fa_q);break;
+			case 'r': lv_img_set_src(pobj, &fa_r);break;
+			case 's': lv_img_set_src(pobj, &fa_s);break;
+			case 't': lv_img_set_src(pobj, &fa_t);break;
+			case 'u': lv_img_set_src(pobj, &fa_u);break;
+			case 'v': lv_img_set_src(pobj, &fa_v);break;
+			case 'w': lv_img_set_src(pobj, &fa_w);break;
+			case 'y': lv_img_set_src(pobj, &fa_y);break;
+			case 'z': lv_img_set_src(pobj, &fa_z);break;
+			case '-': lv_img_set_src(pobj, &sy_m);break;
+
+#else
+			case '0': lv_img_set_src(pobj, &fa0_png);break;
+			case '1': lv_img_set_src(pobj, &fa1_png);break;
+			case '2': lv_img_set_src(pobj, &fa2_png);break;
+			case '3': lv_img_set_src(pobj, &fa3_png);break;
+			case '4': lv_img_set_src(pobj, &fa4_png);break;
+			case '5': lv_img_set_src(pobj, &fa5_png);break;
+			case '6': lv_img_set_src(pobj, &fa6_png);break;
+			case '7': lv_img_set_src(pobj, &fa7_png);break;
+			case '8': lv_img_set_src(pobj, &fa8_png);break;
+			case '9': lv_img_set_src(pobj, &fa9_png);break;
+
+			case 'a': lv_img_set_src(pobj, &faa_png);break;
+			case 'b': lv_img_set_src(pobj, &fab_png);break;
+			case 'c': lv_img_set_src(pobj, &fac_png);break;
+			case 'd': lv_img_set_src(pobj, &fad_png);break;
+			case 'e': lv_img_set_src(pobj, &fae_png);break;
+			case 'f': lv_img_set_src(pobj, &faf_png);break;
+			case 'g': lv_img_set_src(pobj, &fag_png);break;
+			case 'h': lv_img_set_src(pobj, &fah_png);break;
+			case 'i': lv_img_set_src(pobj, &fai_png);break;
+			case 'j': lv_img_set_src(pobj, &faj_png);break;
+			case 'k': lv_img_set_src(pobj, &fak_png);break;
+			case 'l': lv_img_set_src(pobj, &fal_png);break;
+			case 'm': lv_img_set_src(pobj, &fam_png);break;
+			case 'n': lv_img_set_src(pobj, &fan_png);break;
+			case 'o': lv_img_set_src(pobj, &fao_png);break;
+			case 'p': lv_img_set_src(pobj, &fap_png);break;
+			case 'q': lv_img_set_src(pobj, &faq_png);break;
+			case 'r': lv_img_set_src(pobj, &far_png);break;
+			case 's': lv_img_set_src(pobj, &fas_png);break;
+			case 't': lv_img_set_src(pobj, &fat_png);break;
+			case 'u': lv_img_set_src(pobj, &fau_png);break;
+			case 'v': lv_img_set_src(pobj, &fav_png);break;
+			case 'w': lv_img_set_src(pobj, &faw_png);break;
+			case 'y': lv_img_set_src(pobj, &fay_png);break;
+			case 'z': lv_img_set_src(pobj, &faz_png);break;
+
+			case '-': lv_img_set_src(pobj, &faminus_png);break;
+#endif
+			}
 		}
 	}
 
@@ -528,39 +550,6 @@ void display_floor(int8_t left, int8_t right)
 
 }
 
-
-
-/*
- * NXT butonu ile yonelim degistirme.
- *
- * M031 pakete byte 13'te buton MASKESI koyuyor (arcodeLop.reserved2) ve buton
- * basili kaldigi surece maske set kaliyor. Burada KENAR yakaliyoruz: yalnizca
- * "yoktu -> var oldu" gecisinde tetikleniyor. Boylece bir paket kaybolsa bile
- * bir sonraki ayni seviyeyi tasidigi icin cift tetikleme olmuyor.
- */
-#define BTN_CODE_NXT		0x01
-#define BTN_CODE_RTN		0x02
-
-static void handle_buttons(uint8_t btn)
-{
-	static uint8_t btn_prev = 0;
-
-	if((btn & BTN_CODE_NXT) && !(btn_prev & BTN_CODE_NXT))
-	{
-		g_orient = (g_orient == ORIENT_HOR) ? ORIENT_VER : ORIENT_HOR;
-
-		meprom_save_orient(g_orient);
-
-		/* Yerlesim makrolari artik yeni degeri okuyacak; dondurulmus
-		   gorseller onbellekte durdugu icin onbellegi bosaltip tam
-		   ekran yeniden cizim istiyoruz. Bir sonraki display_floor() /
-		   display_state() cagrisi her seyi yeni yonelimle kuruyor. */
-		lv_img_cache_invalidate_src(NULL);
-		lv_obj_invalidate(lv_scr_act());
-	}
-
-	btn_prev = btn;
-}
 
 MAIN_PAGE_T * main_page_create(void)
 {  
@@ -620,9 +609,6 @@ struct  ArcodeM2H arcodeLop;
 
 static void main_page_run(void *p)
 {
-	meprom_init();
-	g_orient = meprom_load_orient(g_orient);
-
     main_page_create();
 
 	arcode_init();
@@ -738,8 +724,6 @@ static void main_page_run(void *p)
 			
 				memcpy(&arcodeLop, &arcode_data[2],sizeof(arcodeLop));
 
-				handle_buttons(arcodeLop.reserved2);
-
 #ifdef DISPLAY_MSG
 
 				if(arcodeLop.infoMessageNo != 0xFF && arcodeLop.infoMessageNo != 7)
@@ -755,42 +739,74 @@ static void main_page_run(void *p)
 					if(arcodeLop.infoMessageNo == 0)
 					{
 						//Out of service
-						lv_img_set_src(p_main_bg, (g_orient == ORIENT_HOR) ? &messageOutOfServiceHorEn : &messageOutOfServiceVerEn);
+						#ifdef DISPLAY_VER
+						lv_img_set_src(p_main_bg, &messageOutOfServiceVerEn);
+						#else
+						lv_img_set_src(p_main_bg, &messageOutOfServiceHorEn);
+						#endif
 					}
 					else if(arcodeLop.infoMessageNo == 1)
 					{
 						//Overloaded
-						lv_img_set_src(p_main_bg, (g_orient == ORIENT_HOR) ? &messageOverloadedHorEn : &messageOverloadedVerEn);
+						#ifdef DISPLAY_VER
+						lv_img_set_src(p_main_bg, &messageOverloadedVerEn);
+						#else
+						lv_img_set_src(p_main_bg, &messageOverloadedHorEn);
+						#endif
 					}
 					else if(arcodeLop.infoMessageNo == 2)
 					{
 						//On Maintenance
-						lv_img_set_src(p_main_bg, (g_orient == ORIENT_HOR) ? &messageLiftOnMaintenanceHorEn : &messageLiftOnMaintenanceVerEn);
+						#ifdef DISPLAY_VER
+						lv_img_set_src(p_main_bg, &messageLiftOnMaintenanceVerEn);
+						#else
+						lv_img_set_src(p_main_bg, &messageLiftOnMaintenanceHorEn);
+						#endif
 					}
 					else if(arcodeLop.infoMessageNo == 3)
 					{
 						//Fire evacuation
-						lv_img_set_src(p_main_bg, (g_orient == ORIENT_HOR) ? &messageFireEvacuationHorEn : &messageFireEvacuationVerEn);
+						#ifdef DISPLAY_VER
+						lv_img_set_src(p_main_bg, &messageFireEvacuationVerEn);
+						#else
+						lv_img_set_src(p_main_bg, &messageFireEvacuationHorEn);
+						#endif
 					}
 					else if(arcodeLop.infoMessageNo == 4)
 					{
 						//backup power evacuation
-						lv_img_set_src(p_main_bg, (g_orient == ORIENT_HOR) ? &messageBackupPowerEvacuationHorEn : &messageBackupPowerEvacuationVerEn);
+						#ifdef DISPLAY_VER
+						lv_img_set_src(p_main_bg, &messageBackupPowerEvacuationVerEn);
+						#else
+						lv_img_set_src(p_main_bg, &messageBackupPowerEvacuationHorEn);
+						#endif
 					}
 					else if(arcodeLop.infoMessageNo == 5)
 					{
 						//startup
-						lv_img_set_src(p_main_bg, (g_orient == ORIENT_HOR) ? &messageStartupHorEn : &messageStartupVerEn);
+						#ifdef DISPLAY_VER
+						lv_img_set_src(p_main_bg, &messageStartupVerEn);
+						#else
+						lv_img_set_src(p_main_bg, &messageStartupHorEn);
+						#endif
 					}
 					else if(arcodeLop.infoMessageNo == 6)
 					{
 						//startup
-						lv_img_set_src(p_main_bg, (g_orient == ORIENT_HOR) ? &messageDoorOpenErrorHorEn : &messageDoorOpenErrorVerEn);
+						#ifdef DISPLAY_VER
+						lv_img_set_src(p_main_bg, &messageDoorOpenErrorVerEn);
+						#else
+						lv_img_set_src(p_main_bg, &messageDoorOpenErrorHorEn);
+						#endif
 					}
 					else if(arcodeLop.infoMessageNo == 8 || arcodeLop.infoMessageNo == 9)
 					{
 						//Service control
-						lv_img_set_src(p_main_bg, (g_orient == ORIENT_HOR) ? &messageServiceControlHorEn : &messageServiceControlVerEn);
+						#ifdef DISPLAY_VER
+						lv_img_set_src(p_main_bg, &messageServiceControlVerEn);
+						#else
+						lv_img_set_src(p_main_bg, &messageServiceControlHorEn);
+						#endif
 					}
 
 				}
